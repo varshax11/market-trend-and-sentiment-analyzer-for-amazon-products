@@ -23,7 +23,59 @@ The **Market Trend and Sentiment Analyzer for Amazon Products** is a Python-base
 - **Matplotlib:** For visualizing success rates and trends.
 - **ChromeDriver:** Required for Selenium to interact with the Chrome browser.
 
-You can install the required Python packages using:
+## Installation
 
-```bash
-pip install selenium beautifulsoup4 nltk matplotlib
+1. **Clone the repository:**
+
+    ```sh
+    git clone https://github.com/yourusername/amazon-product-review-analysis.git
+    ```
+
+2. **Navigate to the project directory:**
+
+    ```sh
+    cd amazon-product-review-analysis
+    ```
+
+3. **Install the required dependencies:**
+
+    Create a `requirements.txt` file with the following content:
+
+    ```txt
+    pandas
+    selenium
+    beautifulsoup4
+    nltk
+    matplotlib
+    ```
+
+    Install the dependencies using:
+
+    ```sh
+    pip install -r requirements.txt
+    ```
+
+4. **Ensure ChromeDriver is installed and its path is set in the script.**
+
+## Usage
+
+1. **Run the main script:**
+
+    ```sh
+    python amazon_product_scraper.py
+    ```
+
+2. **When prompted, enter the product category you wish to scrape (e.g., "iPad", "laptop").**
+
+    The script will:
+
+    - Extract product information from Amazon.
+    - Perform sentiment analysis on product reviews.
+    - Extract positive and negative features from reviews.
+    - Generate recommendations for product improvements and development.
+    - Visualize the potential success rate based on the recommendations.
+    - Save the results and visualizations into a CSV file named based on the category and the current date.
+    - Open the CSV file automatically after creation, or find it in the current directory.
+
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.

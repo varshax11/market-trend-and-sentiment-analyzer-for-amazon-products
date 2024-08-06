@@ -14,6 +14,8 @@ from nltk.corpus import stopwords
 from nltk.sentiment import SentimentIntensityAnalyzer
 import tkinter as tk
 from tkinter import ttk
+import matplotlib.pyplot as plt
+import numpy as np
 
 class AmazonProductScraper:
     def __init__(self):
@@ -210,6 +212,45 @@ class AmazonProductScraper:
             if feature in self.positive_feature_map:
                 recommendations.append(self.positive_feature_map[feature])
         return recommendations
+    def visualize_random_success_rate():
+    """
+    Generates and visualizes random success rates for demonstration purposes.
+    """
+    # Generate random categories and success rates
+    categories = [f'Feature {i}' for i in range(1, 11)]
+    success_rates = np.random.uniform(50, 90, size=len(categories))
+    
+    # Define the figure and axis
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Create a bar plot for the success rates
+    bars = ax.bar(categories, success_rates, color='skyblue')
+    
+    # Add labels and title
+    ax.set_xlabel('Features', fontsize=14)
+    ax.set_ylabel('Success Rate (%)', fontsize=14)
+    ax.set_title('Random Success Rate Visualization', fontsize=16)
+    
+    # Add value labels on top of bars
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(
+            bar.get_x() + bar.get_width() / 2.0, height,
+            f'{height:.2f}%',
+            ha='center', va='bottom',
+            fontsize=12
+        )
+    
+    # Rotate x-axis labels if needed
+    plt.xticks(rotation=45, ha='right', fontsize=12)
+    plt.yticks(fontsize=12)
+    
+    # Display the plot
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    visualize_random_success_rate()
 
 def main():
     scraper = AmazonProductScraper()

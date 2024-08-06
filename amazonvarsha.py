@@ -24,32 +24,32 @@ class AmazonProductScraper:
         self.sid = SentimentIntensityAnalyzer()
         self.stop_words = set(stopwords.words('english'))
         self.issue_map = {
-            "poor": "Improve the overall quality and durability by using better materials.",
-            "bad": "Enhance the performance by addressing common complaints and incorporating feedback.",
-            "expensive": "Consider offering more competitive pricing or additional features.",
-            "slow": "Optimize speed and efficiency by improving software or hardware components.",
-            "difficult": "Simplify usage and improve the user interface with better design.",
-            "complex": "Make it more user-friendly by streamlining features.",
-            "uncomfortable": "Increase comfort through ergonomic design.",
-            "weak": "Strengthen durability by reinforcing critical components.",
-            "break": "Ensure better build quality to avoid breakages.",
-            "noisy": "Reduce noise levels by improving insulation or using quieter components.",
-            "battery": "Extend battery life by optimizing power management.",
-            "small": "Consider offering larger or more versatile sizes.",
-            "large": "Offer more compact versions for convenience.",
-            "heavy": "Make it lighter and easier to handle with lighter materials."
+            "poor": "To enhance the overall quality and durability, consider using higher-grade materials and implementing stricter quality control measures.",
+            "bad": "Improve performance by addressing common complaints through rigorous testing and incorporating user feedback into design improvements.",
+            "expensive": "Evaluate pricing strategies and consider offering additional features or bundling options to provide better value for money.",
+            "slow": "Optimize the product's speed and efficiency by upgrading software or hardware components and eliminating performance bottlenecks.",
+            "difficult": "Simplify usage by improving the user interface design to be more intuitive and user-friendly, based on common user feedback.",
+            "complex": "Streamline features and user interfaces to make the product easier to use, ensuring that essential functions are accessible without unnecessary complexity.",
+            "uncomfortable": "Increase user comfort by focusing on ergonomic design improvements and incorporating user feedback on comfort and usability.",
+            "weak": "Enhance durability by reinforcing critical components and conducting stress tests to identify and address potential weaknesses.",
+            "break": "Improve build quality to prevent breakages by using more durable materials and enhancing product design to withstand everyday use.",
+            "noisy": "Reduce noise levels by using quieter components or incorporating better sound insulation to minimize disturbances during operation.",
+            "battery": "Extend battery life by optimizing power management features and using more efficient battery technology to support longer usage times.",
+            "small": "Consider offering larger or more versatile size options to meet diverse customer needs and preferences.",
+            "large": "Provide more compact versions of the product to accommodate users who prefer smaller, more portable options.",
+            "heavy": "Reduce the product's weight by using lighter materials and optimizing design to improve portability and ease of handling."
         }
         self.positive_feature_map = {
-            "quality": "Ensure high-quality materials and craftsmanship.",
-            "display": "Provide a clear and vibrant display.",
-            "price": "Offer good value for the price.",
-            "performance": "Focus on high performance and efficiency.",
-            "battery": "Extend battery life for longer usage.",
-            "storage": "Offer ample storage space.",
-            "speed": "Focus on fast speed and responsiveness.",
-            "build": "Ensure a sturdy and durable build.",
-            "ease": "Design for ease of use and intuitive operation.",
-            "compatibility": "Optimize for compatibility with major systems like iOS."
+            "quality": "Ensure that the product maintains high standards of material and craftsmanship for enhanced user satisfaction.",
+            "display": "Provide a display that is clear, vibrant, and easy to view under various lighting conditions to improve user experience.",
+            "price": "Offer the product at a competitive price point to deliver good value for money and attract more customers.",
+            "performance": "Focus on high performance and efficiency to meet user expectations and support demanding tasks or applications.",
+            "battery": "Extend battery life to allow for longer usage between charges, enhancing convenience and usability.",
+            "storage": "Provide ample storage space to accommodate user needs and ensure the product can handle a variety of data or content.",
+            "speed": "Ensure fast speed and responsiveness to improve user satisfaction and efficiency in performing tasks.",
+            "build": "Ensure the product has a sturdy and durable build to withstand regular use and enhance longevity.",
+            "ease": "Design the product for ease of use with an intuitive interface and straightforward operation to enhance user experience.",
+            "compatibility": "Optimize the product for compatibility with major systems or platforms to ensure seamless integration and functionality."
         }
 
     def open_browser(self):
@@ -186,109 +186,40 @@ class AmazonProductScraper:
     def close_browser(self):
         self.driver.quit()
 
-    def clean_review_text(self, text):
-        tokens = word_tokenize(text)
-        cleaned_tokens = [word.lower() for word in tokens if word.isalpha() and word.lower() not in self.stop_words]
-        return " ".join(cleaned_tokens)
+    def clean_review_text(self, review_text):
+        tokens = word_tokenize(review_text.lower())
+        cleaned_tokens = [word for word in tokens if word.isalnum() and word not in self.stop_words]
+        cleaned_review = ' '.join(cleaned_tokens)
+        return cleaned_review
 
-    def extract_unique_features(self, reviews, sentiment='Positive'):
-        features = []
-        if sentiment == 'Positive':
-            selected_reviews = [review[0] for review in reviews if review[1] == 'Positive']
-            print(f"Positive Reviews: {selected_reviews}")  # Debug print
-            for review in selected_reviews:
-                for feature, suggestion in self.positive_feature_map.items():
-                    if feature in review.lower():
-                        features.append(suggestion)
-        else:
-            selected_reviews = [review[0] for review in reviews if review[1] == 'Negative']
-            print(f"Negative Reviews: {selected_reviews}")  # Debug print
-            for review in selected_reviews:
-                for issue, solution in self.issue_map.items():
-                    if issue in review.lower():
-                        features.append(solution)
-        print(f"Extracted Features: {features}")  # Debug print
-        return list(set(features))  # Remove duplicates
+    def extract_unique_features(self, reviews, sentiment):
+        feature_set = set()
+        for review_text, sentiment_label in reviews:
+            if sentiment_label == sentiment:
+                tokens = word_tokenize(review_text.lower())
+                features = [word for word in tokens if word.isalnum() and word not in self.stop_words]
+                feature_set.update(features)
+        return ', '.join(feature_set)
 
     def transform_negative_features(self, negative_features, positive_features):
-        transformed_features = [self.issue_map.get(issue, issue) for issue in negative_features]
-        return transformed_features + [feature for feature in positive_features if feature not in transformed_features]
+        recommendations = []
+        for feature in negative_features.split(', '):
+            if feature in self.issue_map:
+                recommendations.append(self.issue_map[feature])
+        for feature in positive_features.split(', '):
+            if feature in self.positive_feature_map:
+                recommendations.append(self.positive_feature_map[feature])
+        return recommendations
 
-    def get_recommendations_csv(self, records):
-        today = date.today().strftime("%d-%m-%Y")
-        file_name = "{}_recommendations_{}.csv".format(self.category_name.replace(" ", "_"), today)
-        
-        recommendations_set = set()
-        for record in records:
-            positive_features = self.extract_unique_features(record[5], sentiment='Positive')
-            negative_features = self.extract_unique_features(record[5], sentiment='Negative')
-            recommendations = self.transform_negative_features(negative_features, positive_features)
-            recommendations_set.update(recommendations)
-        
-        with open(file_name, "w", newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow(['Recommendations'])
-            for rec in recommendations_set:
-                writer.writerow([rec])
-        
-        print(f">> Recommendations are stored in {file_name}\n")
-        try:
-            if platform.system() == "Windows":
-                os.startfile(file_name)
-            elif platform.system() == "Darwin":
-                os.system(f"open {file_name}")
-            else:
-                os.system(f"xdg-open {file_name}")
-        except Exception as e:
-            print("Failed to open the file automatically. You can find it in the current directory.")
-
-# Function to get product info and display recommendations only
-def get_product_info():
-    category_name = entry.get()
+def main():
     scraper = AmazonProductScraper()
     scraper.open_browser()
+
+    category_name = input("Enter the product category you want to scrape: ")
     category_url = scraper.get_category_url(category_name)
     records = scraper.navigate_to_other_pages(category_url)
+    scraper.product_information_spreadsheet(records)
     scraper.close_browser()
-    
-    # Save recommendations to CSV
-    scraper.get_recommendations_csv(records)
-    
-    # Generate recommendations for UI
-    recommendations_set = set()  # Use a set to avoid duplicates
-    for record in records:
-        positive_features = scraper.extract_unique_features(record[5], sentiment='Positive')
-        negative_features = scraper.extract_unique_features(record[5], sentiment='Negative')
-        recommendations = scraper.transform_negative_features(negative_features, positive_features)
-        recommendations_set.update(recommendations)
-    
-    recommendations_text = "\n".join(recommendations_set)
-    
-    # Update UI with recommendations only
-    result_text.delete("1.0", tk.END)
-    result_text.insert(tk.END, recommendations_text)
 
-# Set up the Tkinter UI
-root = tk.Tk()
-root.title("Amazon Product Scraper")
-
-frame = ttk.Frame(root, padding="10")
-frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-
-entry_label = ttk.Label(frame, text="Enter product category:")
-entry_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
-
-entry = ttk.Entry(frame, width=50)
-entry.grid(row=0, column=1, padx=5, pady=5)
-
-search_button = ttk.Button(frame, text="Get Recommendations", command=get_product_info)
-search_button.grid(row=0, column=2, padx=5, pady=5)
-
-result_text = tk.Text(frame, wrap=tk.WORD, height=20, width=80)
-result_text.grid(row=1, column=0, columnspan=3, padx=5, pady=5)
-
-root.mainloop()
-
-
-
-
+if __name__ == "__main__":
+    main()

@@ -50,10 +50,7 @@ This project analyzes Amazon product reviews to extract valuable insights and ge
 
 3. The script will generate a CSV file with the analysis results and print the recommendations to the console.
 
-## Sample Data
-
-A sample data file is included in the `sample_data` directory for reference.
-
+   
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -1,4 +1,4 @@
-# Amazon Product Review Analysis and Feature Recommendation System for startups 
+# Amazon Product Review Analysis and Feature Recommendation System for Startups 
 
 ## Overview
 

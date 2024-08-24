@@ -2,32 +2,31 @@ import time
 import csv
 import os
 import platform
+import nltk
 from datetime import date
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
 from bs4 import BeautifulSoup
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.sentiment import SentimentIntensityAnalyzer
-import tkinter as tk
-from tkinter import ttk
-import matplotlib.pyplot as plt
-import numpy as np
+
+# Ensure NLTK resources are downloaded
+nltk.download('punkt')
+nltk.download('stopwords')
 
 class AmazonProductScraper:
     def __init__(self):
         self.driver = None
-        self.category_name = None
-        self.formatted_category_name = None
-        self.chrome_driver_path = '/Users/muralikrishamurthy/.wdm/drivers/chromedriver/mac64/126.0.6478.126/chromedriver-mac-arm64/chromedriver'
+        self.product_name = None
+        self.chrome_driver_path = '/path/to/chromedriver'  # Update with your ChromeDriver path
         self.sid = SentimentIntensityAnalyzer()
         self.stop_words = set(stopwords.words('english'))
         self.issue_map = {
-            "poor": "To enhance the overall quality and durability, consider using higher-grade materials and implementing stricter quality control measures.",
-            "bad": "Improve performance by addressing common complaints through rigorous testing and incorporating user feedback into design improvements.",
+            "poor": "Improve performance by addressing common complaints through rigorous testing and incorporating user feedback into design improvements.",
+            "bad": "Enhance the overall quality by using higher-grade materials and implementing stricter quality control measures.",
             "expensive": "Evaluate pricing strategies and consider offering additional features or bundling options to provide better value for money.",
             "slow": "Optimize the product's speed and efficiency by upgrading software or hardware components and eliminating performance bottlenecks.",
             "difficult": "Simplify usage by improving the user interface design to be more intuitive and user-friendly, based on common user feedback.",
@@ -67,13 +66,13 @@ class AmazonProductScraper:
         self.driver.get(url)
         time.sleep(3)
 
-    def get_category_url(self, category_name):
-        self.category_name = category_name
-        self.formatted_category_name = self.category_name.replace(" ", "+")
-        category_url = "https://www.amazon.in/s?k={}&ref=nb_sb_noss".format(self.formatted_category_name)
-        print(">> Category URL: ", category_url)
-        self.driver.get(category_url)
-        return category_url
+    def get_product_url(self, product_name):
+        self.product_name = product_name
+        formatted_product_name = self.product_name.replace(" ", "+")
+        product_url = "https://www.amazon.in/s?k={}&ref=nb_sb_noss".format(formatted_product_name)
+        print(">> Product URL: ", product_url)
+        self.driver.get(product_url)
+        return product_url
 
     def extract_webpage_information(self):
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
@@ -117,150 +116,90 @@ class AmazonProductScraper:
                     for idx, review_element in enumerate(review_elements[:5]):
                         try:
                             review_text = review_element.find_element(By.XPATH, ".//span[@data-hook='review-body']").text.strip()
-                            cleaned_review = self.clean_review_text(review_text)
-                            sentiment_scores = self.sid.polarity_scores(cleaned_review)
-                            if sentiment_scores['compound'] >= 0.05:
-                                sentiment_label = 'Positive'
-                            elif sentiment_scores['compound'] <= -0.05:
-                                sentiment_label = 'Negative'
-                            else:
-                                sentiment_label = 'Neutral'
-                            reviews[idx] = (review_text, sentiment_label)
-                        except NoSuchElementException:
-                            reviews[idx] = ("N/A", "N/A")
-                except NoSuchElementException:
-                    reviews = [("N/A", "N/A"), ("N/A", "N/A"), ("N/A", "N/A"), ("N/A", "N/A"), ("N/A", "N/A")]
+                            sentiment_scores = self.sid.polarity_scores(review_text)
+                            sentiment = 'positive' if sentiment_scores['compound'] >= 0.05 else 'negative'
+                            reviews[idx] = review_text
+                        except Exception as e:
+                            print(f"Error extracting review {idx+1}: {e}")
 
-            product_information = (description, product_price, product_review, review_number, category_url, reviews)
-            temp_record.append(product_information)
+                except Exception as e:
+                    print(f"Error accessing category URL {category_url}: {e}")
+
+            temp_record.append({
+                'description': description,
+                'price': product_price,
+                'review': product_review,
+                'review_count': review_number,
+                'reviews': reviews
+            })
 
         return temp_record
 
-    def navigate_to_other_pages(self, category_url):
-        records = []
-        page_number = 1
-
-        while True:
-            print(f">> Extracting page {page_number}")
-            page_results = self.extract_webpage_information()
-            temp_record = self.extract_product_information(page_results)
-            records.extend(temp_record)
-
-            try:
-                next_button = self.driver.find_element(By.XPATH, "//li[@class='a-last']/a")
-                next_button.click()
-                page_number += 1
-                time.sleep(3)
-            except (NoSuchElementException, ElementClickInterceptedException):
-                break
-
-        return records
-
-    def product_information_spreadsheet(self, records):
-        today = date.today().strftime("%d-%m-%Y")
-        file_name = "{}_{}.csv".format(self.category_name.replace(" ", "_"), today)
-
-        with open(file_name, "w", newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow(['Description', 'Price', 'Rating', 'Review Count', 'Product URL', 'Review 1', 'Sentiment 1', 'Review 2', 'Sentiment 2', 'Review 3', 'Sentiment 3', 'Review 4', 'Sentiment 4', 'Review 5', 'Sentiment 5', 'Positive Features', 'Recommendations'])
-            for record in records:
-                reviews_info = []
-                for review in record[5]:
-                    reviews_info.extend(review)
-
-                positive_features = self.extract_unique_features(record[5], sentiment='Positive')
-                negative_features = self.extract_unique_features(record[5], sentiment='Negative')
-                recommendations = self.transform_negative_features(negative_features, positive_features)
-
-                writer.writerow([record[0], record[1], record[2], record[3], record[4]] + reviews_info + [positive_features, "\n".join(recommendations)])
-
-        print(f">> Information about the product '{self.category_name}' is stored in {file_name}\n")
-        try:
-            if platform.system() == "Windows":
-                os.startfile(file_name)
-            elif platform.system() == "Darwin":
-                os.system(f"open {file_name}")
-            else:
-                os.system(f"xdg-open {file_name}")
-        except Exception as e:
-            print("Failed to open the file automatically. You can find it in the current directory.")
-
-    def close_browser(self):
-        self.driver.quit()
-
     def clean_review_text(self, review_text):
         tokens = word_tokenize(review_text.lower())
-        cleaned_tokens = [word for word in tokens if word.isalnum() and word not in self.stop_words]
-        cleaned_review = ' '.join(cleaned_tokens)
-        return cleaned_review
+        filtered_tokens = [word for word in tokens if word.isalnum() and word not in self.stop_words]
+        return ' '.join(filtered_tokens)
 
-    def extract_unique_features(self, reviews, sentiment):
-        feature_set = set()
-        for review_text, sentiment_label in reviews:
-            if sentiment_label == sentiment:
-                tokens = word_tokenize(review_text.lower())
-                features = [word for word in tokens if word.isalnum() and word not in self.stop_words]
-                feature_set.update(features)
-        return ', '.join(feature_set)
+    def analyze_reviews(self, records):
+        recommendations = set()
 
-    def transform_negative_features(self, negative_features, positive_features):
-        recommendations = []
-        for feature in negative_features.split(', '):
-            if feature in self.issue_map:
-                recommendations.append(self.issue_map[feature])
-        for feature in positive_features.split(', '):
-            if feature in self.positive_feature_map:
-                recommendations.append(self.positive_feature_map[feature])
-        return recommendations
-    def visualize_random_success_rate():
-    """
-    Generates and visualizes random success rates for demonstration purposes.
-    """
-    # Generate random categories and success rates
-    categories = [f'Feature {i}' for i in range(1, 11)]
-    success_rates = np.random.uniform(50, 90, size=len(categories))
-    
-    # Define the figure and axis
-    fig, ax = plt.subplots(figsize=(12, 8))
-    
-    # Create a bar plot for the success rates
-    bars = ax.bar(categories, success_rates, color='skyblue')
-    
-    # Add labels and title
-    ax.set_xlabel('Features', fontsize=14)
-    ax.set_ylabel('Success Rate (%)', fontsize=14)
-    ax.set_title('Random Success Rate Visualization', fontsize=16)
-    
-    # Add value labels on top of bars
-    for bar in bars:
-        height = bar.get_height()
-        ax.text(
-            bar.get_x() + bar.get_width() / 2.0, height,
-            f'{height:.2f}%',
-            ha='center', va='bottom',
-            fontsize=12
-        )
-    
-    # Rotate x-axis labels if needed
-    plt.xticks(rotation=45, ha='right', fontsize=12)
-    plt.yticks(fontsize=12)
-    
-    # Display the plot
-    plt.tight_layout()
-    plt.show()
+        for record in records:
+            reviews = record['reviews']
+            issues = set()
+            positive_features = set()
 
+            for review in reviews:
+                cleaned_review = self.clean_review_text(review)
+                sentiment_scores = self.sid.polarity_scores(cleaned_review)
+                sentiment = 'positive' if sentiment_scores['compound'] >= 0.05 else 'negative'
+
+                if sentiment == 'negative':
+                    for issue, recommendation in self.issue_map.items():
+                        if issue in cleaned_review:
+                            issues.add(issue)
+                            recommendations.add(recommendation)
+                            break
+
+                if sentiment == 'positive':
+                    for feature, recommendation in self.positive_feature_map.items():
+                        if feature in cleaned_review:
+                            positive_features.add(feature)
+                            recommendations.add(recommendation)
+                            break
+
+            record['issues'] = list(issues)
+            record['positive_features'] = list(positive_features)
+
+        return records, list(recommendations)
+
+    def save_to_csv(self, records, filename):
+        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['description', 'price', 'review_count', 'issues', 'positive_features']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            writer.writeheader()
+            for record in records:
+                writer.writerow({
+                    'description': record['description'],
+                    'price': record['price'],
+                    'review_count': record['review_count'],
+                    'issues': ', '.join(record['issues']),
+                    'positive_features': ', '.join(record['positive_features'])
+                })
+
+    def run(self, product_name):
+        self.open_browser()
+        product_url = self.get_product_url(product_name)
+        page_results = self.extract_webpage_information()
+        records = self.extract_product_information(page_results)
+        analyzed_records, recommendations = self.analyze_reviews(records)
+        self.save_to_csv(analyzed_records, f'{product_name}_review_analysis.csv')
+        print("Recommendations:")
+        for rec in recommendations:
+            print(f"- {rec}")
+
+# Example usage
 if __name__ == "__main__":
-    visualize_random_success_rate()
-
-def main():
     scraper = AmazonProductScraper()
-    scraper.open_browser()
-
-    category_name = input("Enter the product category you want to scrape: ")
-    category_url = scraper.get_category_url(category_name)
-    records = scraper.navigate_to_other_pages(category_url)
-    scraper.product_information_spreadsheet(records)
-    scraper.close_browser()
-
-if __name__ == "__main__":
-    main()
+    product_name = input("Enter the product name: ")
+    scraper.run(product_name)
